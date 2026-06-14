@@ -1,0 +1,5 @@
+.env
+.env.local
+.next/
+*.json
+node_modules/
