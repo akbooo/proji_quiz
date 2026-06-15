@@ -49,7 +49,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="page-wrap">
-        <div style={{ color: '#667085' }}>Загружаем дашборд...</div>
+        <div style={{ color: '#5a6c7d' }}>Загружаем дашборд...</div>
       </div>
     );
   }
@@ -61,7 +61,7 @@ export default function DashboardPage() {
       <div className="dashboard-shell">
         <header className="dashboard-header">
           <div>
-            <span className="label" style={{ color: '#38bdf8' }}>PROJI DASHBOARD</span>
+            <span className="label" style={{ color: '#2c3e50' }}>PROJI DASHBOARD</span>
             <h1>Growth Score аналитика</h1>
             <p>Прохождения, источники, слабые зоны и горячие лиды из Google Sheets.</p>
           </div>
@@ -184,7 +184,7 @@ function RankList({ data }: { data: Record<string, number> }) {
             <strong>{count}</strong>
           </div>
           <div className="bar-track">
-            <div className="bar-fill" style={{ width: `${(count / max) * 100}%`, background: '#38bdf8' }} />
+            <div className="bar-fill" style={{ width: `${(count / max) * 100}%`, background: '#e5f3a5' }} />
           </div>
         </div>
       ))}

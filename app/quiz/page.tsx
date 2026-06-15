@@ -18,11 +18,11 @@ import {
 type Step = 'segment' | 'questions' | 'contact';
 
 const blockColors: Record<Block, string> = {
-  sales: '#4f46e5',
-  automation: '#0f766e',
-  data: '#0284c7',
-  team: '#16a34a',
-  ai: '#d97706',
+  sales: '#d6a0ff',
+  automation: '#b6e8e3',
+  data: '#82d5cc',
+  team: '#a8d5ba',
+  ai: '#ffd966',
 };
 
 function QuizContent() {
@@ -73,7 +73,7 @@ function QuizContent() {
       ? 96
       : 12 + ((current + 1) / total) * 76;
   const blockInfo = q ? BLOCKS[q.block] : null;
-  const color = q ? blockColors[q.block] : '#4f46e5';
+  const color = q ? blockColors[q.block] : '#e1f2ab';
 
   const canStart = SEGMENT_FIELDS.every((field) => segment[field.id].trim().length > 0);
 
@@ -130,6 +130,7 @@ function QuizContent() {
       weakestBlocks: result.weakestBlocks,
       summary: result.summary,
       comparison: result.comparison,
+      recommendations: result.recommendations,
       leadScore: result.leadScore,
     }));
 
@@ -141,12 +142,12 @@ function QuizContent() {
       <div className="card">
         <div style={{ marginBottom: 28 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-            <span className="label" style={{ color }}>
+            <span className="label top-label">
               {step === 'segment' && 'Контекст бизнеса'}
               {step === 'questions' && blockInfo && `${blockInfo.emoji} ${blockInfo.label}`}
               {step === 'contact' && 'Персональный отчет'}
             </span>
-            <span style={{ fontSize: 13, color: '#667085' }}>
+            <span style={{ fontSize: 13, color: '#5a6c7d' }}>
               {step === 'questions' ? `${current + 1} / ${total}` : step === 'segment' ? '1 / 3' : '3 / 3'}
             </span>
           </div>
@@ -215,7 +216,7 @@ function QuizContent() {
                     style={{
                       background: isSelected ? `${color}18` : 'rgba(255,255,255,0.03)',
                       borderColor: isSelected ? color : 'rgba(255,255,255,0.08)',
-                      color: isSelected ? '#f8fafc' : '#a7b0c0',
+                      color: isSelected ? '#1a1a1a' : '#2c3e50',
                     }}
                   >
                     <span
@@ -307,7 +308,7 @@ export default function QuizPage() {
   return (
     <Suspense fallback={
       <div className="page-wrap">
-        <div style={{ color: '#667085' }}>Загружаем квиз...</div>
+        <div style={{ color: '#5a6c7d' }}>Загружаем квиз...</div>
       </div>
     }>
       <QuizContent />
