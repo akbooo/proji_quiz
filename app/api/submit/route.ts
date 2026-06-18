@@ -6,11 +6,11 @@ const SHEET_HEADERS = [
   'Score',
   'Уровень',
   'Lead Score',
-  'Продажи',
-  'Автоматизация',
-  'Данные',
-  'Команда',
-  'AI',
+  'Продажи и Клиентский сервис',
+  'Рутинные процессы',
+  'Данные и База знаний',
+  'Операционка и Прогнозы',
+  'Культура и Готовность команды',
   'Сильная зона',
   'Слабые зоны',
   'Сфера',
@@ -33,21 +33,33 @@ const SHEET_HEADERS = [
   'Language',
   'Ответы (JSON)',
   'Обратная связь (JSON)',
+  'ID',
 ];
+
+function getColumnLetter(colIndex: number): string {
+  let temp = colIndex;
+  let letter = '';
+  while (temp >= 0) {
+    letter = String.fromCharCode((temp % 26) + 65) + letter;
+    temp = Math.floor(temp / 26) - 1;
+  }
+  return letter;
+}
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
+      submissionId,
       answers = {},
       feedback = {},
       segment = {},
       contact = {},
       tracking = {},
       scores = {},
-      total,
-      level,
-      leadScore,
+      total = 0,
+      level = '',
+      leadScore = 0,
       weakestBlocks = [],
       strongestBlock = '',
     } = body;
@@ -70,25 +82,84 @@ export async function POST(req: NextRequest) {
     const sheets = google.sheets({ version: 'v4', auth });
     const now = new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' });
 
+    // Always ensure the headers match the latest definition
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
-      range: 'Sheet1!A1:AE1',
+      range: 'Sheet1!A1:AF1',
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [SHEET_HEADERS] },
     });
 
+    // Check for existing rows to handle update vs append
+    let existingRows: any[][] = [];
+    try {
+      const existing = await sheets.spreadsheets.values.get({
+        spreadsheetId: SHEET_ID,
+        range: 'Sheet1!A:AF',
+      });
+      existingRows = existing.data.values || [];
+    } catch (err) {
+      console.warn('Duplicate check: failed to fetch existing rows, proceeding to append', err);
+    }
+
+    let foundRowIndex = -1;
+    let idColIndex = SHEET_HEADERS.indexOf('ID');
+    let feedbackColIndex = SHEET_HEADERS.indexOf('Обратная связь (JSON)');
+
+    if (existingRows.length > 0) {
+      const headers = existingRows[0];
+      const foundIdIndex = headers.indexOf('ID');
+      if (foundIdIndex !== -1) idColIndex = foundIdIndex;
+
+      const foundFeedbackIndex = headers.indexOf('Обратная связь (JSON)');
+      if (foundFeedbackIndex !== -1) feedbackColIndex = foundFeedbackIndex;
+
+      if (submissionId && idColIndex !== -1) {
+        for (let i = 1; i < existingRows.length; i++) {
+          if (existingRows[i][idColIndex] === submissionId) {
+            foundRowIndex = i + 1; // 1-based index in Google Sheets
+            break;
+          }
+        }
+      }
+    }
+
+    // If row exists, we update or skip
+    if (foundRowIndex !== -1) {
+      const hasFeedback = feedback && Object.keys(feedback).length > 0;
+      if (hasFeedback && feedbackColIndex !== -1) {
+        const feedbackColLetter = getColumnLetter(feedbackColIndex);
+        const updateRange = `Sheet1!${feedbackColLetter}${foundRowIndex}`;
+
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SHEET_ID,
+          range: updateRange,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: {
+            values: [[JSON.stringify(feedback)]],
+          },
+        });
+
+        return NextResponse.json({ ok: true, saved: true, updated: true });
+      }
+
+      // If it's a duplicate request without feedback, return success without appending
+      return NextResponse.json({ ok: true, saved: true, duplicate: true });
+    }
+
+    // Otherwise, append new row
     const row = [
       now,
       total,
       level,
       leadScore,
-      scores.sales ?? '',
+      scores.sales_support ?? '',
       scores.automation ?? '',
-      scores.data ?? '',
-      scores.team ?? '',
-      scores.ai ?? '',
+      scores.data_knowledge ?? '',
+      scores.predictive_ops ?? '',
+      scores.culture_ready ?? '',
       strongestBlock,
-      weakestBlocks.join(', '),
+      Array.isArray(weakestBlocks) ? weakestBlocks.join(', ') : '',
       segment.industry ?? '',
       segment.companySize ?? '',
       segment.businessModel ?? '',
@@ -107,20 +178,21 @@ export async function POST(req: NextRequest) {
       tracking.landingPath || '',
       tracking.device || '',
       tracking.language || '',
-      JSON.stringify(answers),
-      JSON.stringify(feedback),
+      answers && Object.keys(answers).length > 0 ? JSON.stringify(answers) : '',
+      feedback && Object.keys(feedback).length > 0 ? JSON.stringify(feedback) : '',
+      submissionId ?? '',
     ];
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: 'Sheet1!A:AE',
+      range: 'Sheet1!A:AF',
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [row] },
     });
 
     return NextResponse.json({ ok: true, saved: true });
   } catch (err) {
-    console.error('Sheets error:', err);
+    console.error('Sheets submit error:', err);
     return NextResponse.json({ ok: true, saved: false });
   }
 }

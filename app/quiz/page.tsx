@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   BLOCKS,
@@ -35,6 +35,11 @@ function QuizContent() {
   const [segment, setSegment] = useState<Segment>(EMPTY_SEGMENT);
   const [contact, setContact] = useState<Contact>(EMPTY_CONTACT);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const [submissionId] = useState(() => {
+    const rnd = Math.random().toString(36).substring(2, 11);
+    return `sub_${Date.now()}_${rnd}`;
+  });
 
   const tracking = useMemo<TrackingData>(() => {
     if (typeof window === 'undefined') {
@@ -103,31 +108,41 @@ function QuizContent() {
   };
 
   const submitAndShowResult = async (finalAnswers: Record<string, number>) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
 
     const result = calculateScore(finalAnswers, segment, contact);
 
-    try {
-      await fetch('/api/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          answers: finalAnswers,
-          segment,
-          contact,
-          tracking,
-          scores: result.byBlock,
-          total: result.total,
-          level: result.level,
-          leadScore: result.leadScore,
-          weakestBlocks: result.weakestBlocks,
-          strongestBlock: result.strongestBlock,
-        }),
-      });
-    } catch {}
+    // Call submit API asynchronously in the background with keepalive: true
+    // so it doesn't block navigation and completes even if the page unloads.
+    fetch('/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({
+        submissionId,
+        answers: finalAnswers,
+        segment,
+        contact,
+        tracking,
+        scores: result.byBlock,
+        total: result.total,
+        level: result.level,
+        leadScore: result.leadScore,
+        weakestBlocks: result.weakestBlocks,
+        strongestBlock: result.strongestBlock,
+      }),
+    }).catch((err) => {
+      console.error('Background submit failed:', err);
+    });
+
+    submittingRef.current = false;
+    setSubmitting(false);
 
     router.push(
       `/result?data=${encodeURIComponent(JSON.stringify({
+        submissionId,
         segment,
         contact,
         answers: finalAnswers,
@@ -251,7 +266,7 @@ function QuizContent() {
               <button
                 className="btn btn-primary"
                 onClick={handleNextQuestion}
-                disabled={selected === null}
+                disabled={selected === null || submitting}
                 style={{ flex: 1 }}
               >
                 {current === total - 1 ? 'К результату →' : 'Следующий вопрос →'}

@@ -7,11 +7,11 @@ export const dynamic = 'force-dynamic';
 type Row = Record<string, string>;
 
 const blockNames: Record<Block, string> = {
-  sales: 'Продажи',
-  automation: 'Автоматизация',
-  data: 'Данные',
-  team: 'Команда',
-  ai: 'AI',
+  sales_support: 'Продажи и Клиентский сервис',
+  automation: 'Рутинные процессы',
+  data_knowledge: 'Данные и База знаний',
+  predictive_ops: 'Операционка и Прогнозы',
+  culture_ready: 'Культура и Готовность команды',
 };
 
 export async function GET() {
@@ -33,7 +33,7 @@ export async function GET() {
     const sheets = google.sheets({ version: 'v4', auth });
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: 'Sheet1!A:AD',
+      range: 'Sheet1!A:AF',
     });
 
     const values = response.data.values || [];
