@@ -14,6 +14,7 @@
   --text2: #2c3e50;
   --text3: #5a6c7d;
   --radius: 8px;
+  --primary-blue: #102f5d;
 }
 
 html, body {
@@ -52,8 +53,10 @@ html, body {
   font-weight: 600;
 }
 
-.btn-primary { background: #1a1a1a; color: #fff; }
-.btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+.btn-primary { background: var(--primary-blue); color: #fff; }
+.btn-primary:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.btn-ghost { background: transparent; color: var(--primary-blue); border: 1px solid var(--primary-blue); }
+.btn-ghost:hover { background: rgba(16,47,93,0.08); }
 
 .label { font-size: 12px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
 .screen-title { font-size: clamp(24px, 4vw, 34px); margin: 18px 0 8px; }
