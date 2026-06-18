@@ -15,14 +15,14 @@ import {
   type TrackingData,
 } from '@/lib/quiz';
 
-type Step = 'segment' | 'questions' | 'contact';
+type Step = 'segment' | 'questions';
 
 const blockColors: Record<Block, string> = {
-  sales: '#d6a0ff',
+  sales_support: '#d6a0ff',
   automation: '#b6e8e3',
-  data: '#82d5cc',
-  team: '#a8d5ba',
-  ai: '#ffd966',
+  data_knowledge: '#82d5cc',
+  predictive_ops: '#a8d5ba',
+  culture_ready: '#ffd966',
 };
 
 function QuizContent() {
@@ -69,9 +69,7 @@ function QuizContent() {
   const total = QUESTIONS.length;
   const progress = step === 'segment'
     ? 8
-    : step === 'contact'
-      ? 96
-      : 12 + ((current + 1) / total) * 76;
+    : 12 + ((current + 1) / total) * 76;
   const blockInfo = q ? BLOCKS[q.block] : null;
   const color = q ? blockColors[q.block] : '#e1f2ab';
 
@@ -84,24 +82,37 @@ function QuizContent() {
     setAnswers(newAnswers);
 
     if (current < total - 1) {
-      setCurrent(current + 1);
-      setSelected(newAnswers[QUESTIONS[current + 1].id] ?? null);
+      const next = current + 1;
+      setCurrent(next);
+      setSelected(newAnswers[QUESTIONS[next].id] ?? null);
       return;
     }
 
-    setStep('contact');
+    submitAndShowResult(newAnswers);
   };
 
-  const submitAndShowResult = async () => {
+  const handleBack = () => {
+    if (current === 0) {
+      setStep('segment');
+      return;
+    }
+
+    const prev = current - 1;
+    setCurrent(prev);
+    setSelected(answers[QUESTIONS[prev].id] ?? null);
+  };
+
+  const submitAndShowResult = async (finalAnswers: Record<string, number>) => {
     setSubmitting(true);
-    const result = calculateScore(answers, segment, contact);
+
+    const result = calculateScore(finalAnswers, segment, contact);
 
     try {
       await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          answers,
+          answers: finalAnswers,
           segment,
           contact,
           tracking,
@@ -113,28 +124,25 @@ function QuizContent() {
           strongestBlock: result.strongestBlock,
         }),
       });
-    } catch {
-      // The participant should still receive the result if saving fails.
-    }
+    } catch {}
 
-    const encoded = encodeURIComponent(JSON.stringify({
-      segment,
-      contact,
-      answers,
-      scores: result.byBlock,
-      total: result.total,
-      level: result.level,
-      levelLabel: result.levelLabel,
-      levelColor: result.levelColor,
-      strongestBlock: result.strongestBlock,
-      weakestBlocks: result.weakestBlocks,
-      summary: result.summary,
-      comparison: result.comparison,
-      recommendations: result.recommendations,
-      leadScore: result.leadScore,
-    }));
-
-    router.push(`/result?data=${encoded}`);
+    router.push(
+      `/result?data=${encodeURIComponent(JSON.stringify({
+        segment,
+        contact,
+        answers: finalAnswers,
+        scores: result.byBlock,
+        total: result.total,
+        level: result.level,
+        levelLabel: result.levelLabel,
+        levelColor: result.levelColor,
+        strongestBlock: result.strongestBlock,
+        weakestBlocks: result.weakestBlocks,
+        summary: result.summary,
+        comparison: result.comparison,
+        leadScore: result.leadScore,
+      }))}`
+    );
   };
 
   return (
@@ -142,13 +150,12 @@ function QuizContent() {
       <div className="card">
         <div style={{ marginBottom: 28 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-            <span className="label top-label">
+            <span className="label">
               {step === 'segment' && 'Контекст бизнеса'}
               {step === 'questions' && blockInfo && `${blockInfo.emoji} ${blockInfo.label}`}
-              {step === 'contact' && 'Персональный отчет'}
             </span>
             <span style={{ fontSize: 13, color: '#5a6c7d' }}>
-              {step === 'questions' ? `${current + 1} / ${total}` : step === 'segment' ? '1 / 3' : '3 / 3'}
+              {step === 'questions' ? `${current + 1} / ${total}` : '1 / 2'}
             </span>
           </div>
 
@@ -237,15 +244,7 @@ function QuizContent() {
             <div style={{ display: 'flex', gap: 12 }}>
               <button
                 className="btn btn-ghost"
-                onClick={() => {
-                  if (current === 0) {
-                    setStep('segment');
-                    return;
-                  }
-                  const prev = current - 1;
-                  setCurrent(prev);
-                  setSelected(answers[QUESTIONS[prev].id] ?? null);
-                }}
+                onClick={handleBack}
               >
                 ← Назад
               </button>
@@ -261,44 +260,6 @@ function QuizContent() {
           </>
         )}
 
-        {step === 'contact' && (
-          <>
-            <h1 className="screen-title">Куда отправить короткий план роста?</h1>
-            <p className="screen-copy">
-              Результат покажем сразу. Контакт поможет Proji отправить PDF-отчет или пригласить на бесплатный разбор.
-            </p>
-
-            <div className="form-grid">
-              <label className="field-label">
-                Имя
-                <input className="field-control" value={contact.name} onChange={(event) => setContact((prev) => ({ ...prev, name: event.target.value }))} placeholder="Как к вам обращаться" />
-              </label>
-              <label className="field-label">
-                Компания
-                <input className="field-control" value={contact.company} onChange={(event) => setContact((prev) => ({ ...prev, company: event.target.value }))} placeholder="Название компании" />
-              </label>
-              <label className="field-label">
-                WhatsApp / телефон
-                <input className="field-control" value={contact.phone} onChange={(event) => setContact((prev) => ({ ...prev, phone: event.target.value }))} placeholder="+7..." />
-              </label>
-              <label className="field-label">
-                Email
-                <input className="field-control" value={contact.email} onChange={(event) => setContact((prev) => ({ ...prev, email: event.target.value }))} placeholder="name@company.kz" />
-              </label>
-            </div>
-
-            <div className="notice">
-              Контакт можно оставить позже, но с ним команда Proji сможет подготовить более точный разбор.
-            </div>
-
-            <div style={{ display: 'flex', gap: 12, marginTop: 22 }}>
-              <button className="btn btn-ghost" onClick={() => setStep('questions')}>← Назад</button>
-              <button className="btn btn-primary" onClick={submitAndShowResult} disabled={submitting} style={{ flex: 1 }}>
-                {submitting ? 'Считаем...' : 'Показать результат →'}
-              </button>
-            </div>
-          </>
-        )}
       </div>
     </div>
   );

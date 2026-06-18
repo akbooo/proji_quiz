@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 
-const SHEET_HEADERS = [
+const FEEDBACK_HEADERS = [
   'Дата',
   'Score',
   'Уровень',
   'Lead Score',
-  'Продажи',
-  'Автоматизация',
-  'Данные',
-  'Команда',
-  'AI',
-  'Сильная зона',
-  'Слабые зоны',
   'Сфера',
   'Размер команды',
   'Модель продаж',
@@ -22,34 +15,22 @@ const SHEET_HEADERS = [
   'Компания',
   'Телефон',
   'Email',
-  'UTM Source',
-  'UTM Medium',
-  'UTM Campaign',
-  'UTM Content',
-  'UTM Term',
-  'Referrer',
-  'Landing Path',
-  'Device',
-  'Language',
-  'Ответы (JSON)',
-  'Обратная связь (JSON)',
+  'Feedback Q1',
+  'Feedback Q2',
+  'Feedback Q3',
+  'Feedback JSON',
 ];
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      answers = {},
       feedback = {},
-      segment = {},
-      contact = {},
-      tracking = {},
-      scores = {},
       total,
       level,
       leadScore,
-      weakestBlocks = [],
-      strongestBlock = '',
+      segment = {},
+      contact = {},
     } = body;
 
     const SHEET_ID = process.env.GOOGLE_SHEET_ID;
@@ -57,7 +38,7 @@ export async function POST(req: NextRequest) {
     const PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
     if (!SHEET_ID || !CLIENT_EMAIL || !PRIVATE_KEY) {
-      console.warn('Google Sheets env vars not set - skipping save');
+      console.warn('Google Sheets env vars not set - skipping feedback save');
       return NextResponse.json({ ok: true, saved: false });
     }
 
@@ -69,12 +50,13 @@ export async function POST(req: NextRequest) {
 
     const sheets = google.sheets({ version: 'v4', auth });
     const now = new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' });
+    const sheetName = 'Feedback';
 
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
-      range: 'Sheet1!A1:AE1',
+      range: `${sheetName}!A1:Q1`,
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [SHEET_HEADERS] },
+      requestBody: { values: [FEEDBACK_HEADERS] },
     });
 
     const row = [
@@ -82,13 +64,6 @@ export async function POST(req: NextRequest) {
       total,
       level,
       leadScore,
-      scores.sales ?? '',
-      scores.automation ?? '',
-      scores.data ?? '',
-      scores.team ?? '',
-      scores.ai ?? '',
-      strongestBlock,
-      weakestBlocks.join(', '),
       segment.industry ?? '',
       segment.companySize ?? '',
       segment.businessModel ?? '',
@@ -98,29 +73,22 @@ export async function POST(req: NextRequest) {
       contact.company ?? '',
       contact.phone ?? '',
       contact.email ?? '',
-      tracking.utm_source || 'direct',
-      tracking.utm_medium || '',
-      tracking.utm_campaign || '',
-      tracking.utm_content || '',
-      tracking.utm_term || '',
-      tracking.referrer || '',
-      tracking.landingPath || '',
-      tracking.device || '',
-      tracking.language || '',
-      JSON.stringify(answers),
+      feedback.f1 ?? '',
+      feedback.f2 ?? '',
+      feedback.f3 ?? '',
       JSON.stringify(feedback),
     ];
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: 'Sheet1!A:AE',
+      range: `${sheetName}!A:Q`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [row] },
     });
 
     return NextResponse.json({ ok: true, saved: true });
   } catch (err) {
-    console.error('Sheets error:', err);
-    return NextResponse.json({ ok: true, saved: false });
+    console.error('Feedback save error:', err);
+    return NextResponse.json({ ok: false, saved: false });
   }
 }

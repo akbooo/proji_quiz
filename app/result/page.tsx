@@ -1,9 +1,9 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { BLOCKS, type Block } from '@/lib/quiz';
+import { BLOCKS, FEEDBACK_QUESTIONS, type Block } from '@/lib/quiz';
 
 interface ResultData {
   segment?: Record<string, string>;
@@ -16,7 +16,6 @@ interface ResultData {
   weakestBlocks: Block[];
   summary: string;
   comparison: string;
-  recommendations: string[];
   leadScore: number;
 }
 
@@ -38,6 +37,15 @@ function ResultContent() {
   }
 
   const data = JSON.parse(decodeURIComponent(raw)) as ResultData;
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackAnswers, setFeedbackAnswers] = useState<Record<string, number>>({});
+  const [feedbackCurrent, setFeedbackCurrent] = useState(0);
+  const [feedbackSelected, setFeedbackSelected] = useState<number | null>(null);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const feedbackQuestion = FEEDBACK_QUESTIONS[feedbackCurrent];
+
   const blockList = Object.keys(BLOCKS) as Block[];
   const r = 52;
   const circ = 2 * Math.PI * r;
@@ -57,6 +65,77 @@ function ResultContent() {
   const whatsappText = encodeURIComponent(
     `Здравствуйте! Я прошел Proji Growth Score. Мой результат: ${data.total}/100. Хочу получить PDF-отчет и разбор.`,
   );
+
+  const feedbackSelectedValue = feedbackSelected ?? feedbackAnswers[feedbackQuestion.id] ?? null;
+  const feedbackComplete = FEEDBACK_QUESTIONS.every((question) => feedbackAnswers[question.id] !== undefined);
+
+  const handleOpenFeedback = () => {
+    setShowFeedback(true);
+    setFeedbackCurrent(0);
+    setFeedbackSelected(feedbackAnswers[FEEDBACK_QUESTIONS[0].id] ?? null);
+    setFeedbackMessage('');
+  };
+
+  const handleFeedbackSelect = (value: number) => {
+    setFeedbackSelected(value);
+  };
+
+  const handleFeedbackBack = () => {
+    if (feedbackCurrent === 0) {
+      setShowFeedback(false);
+      return;
+    }
+
+    const prev = feedbackCurrent - 1;
+    setFeedbackCurrent(prev);
+    setFeedbackSelected(feedbackAnswers[FEEDBACK_QUESTIONS[prev].id] ?? null);
+  };
+
+  const submitFeedback = async (finalFeedback: Record<string, number>) => {
+    setFeedbackSubmitting(true);
+    setFeedbackMessage('');
+
+    try {
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          feedback: finalFeedback,
+          total: data.total,
+          level: data.levelLabel,
+          contact: data.contact,
+          segment: data.segment,
+        }),
+      });
+      setFeedbackMessage('Спасибо! Ваш отзыв получен.');
+      setFeedbackSubmitted(true);
+      setShowFeedback(false);
+    } catch {
+      setFeedbackMessage('Ошибка отправки. Попробуйте позже.');
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
+
+  const handleFeedbackNext = async () => {
+    if (feedbackSelectedValue === null) return;
+
+    const nextFeedback = {
+      ...feedbackAnswers,
+      [feedbackQuestion.id]: feedbackSelectedValue,
+    };
+
+    setFeedbackAnswers(nextFeedback);
+
+    if (feedbackCurrent < FEEDBACK_QUESTIONS.length - 1) {
+      const next = feedbackCurrent + 1;
+      setFeedbackCurrent(next);
+      setFeedbackSelected(nextFeedback[FEEDBACK_QUESTIONS[next].id] ?? null);
+      return;
+    }
+
+    await submitFeedback(nextFeedback);
+  };
 
   return (
     <div className="page-wrap page-wrap-scroll">
@@ -137,18 +216,6 @@ function ResultContent() {
           </div>
         </section>
 
-        <section className="result-section">
-          <p className="label">Персональные рекомендации</p>
-          <div className="recommendation-list">
-            {(data.recommendations || []).map((item, index) => (
-              <div key={index} className="recommendation-item">
-                <strong>{index + 1}.</strong>
-                <p>{item}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
         <section className="cta-band">
           <div>
             <p className="label" style={{ color: '#2c3e50' }}>Следующий шаг</p>
@@ -164,6 +231,77 @@ function ResultContent() {
               <button className="btn btn-ghost">Пройти снова</button>
             </Link>
           </div>
+        </section>
+
+        <section className="result-section" style={{ marginTop: 32 }}>
+          {feedbackSubmitted ? (
+            <div style={{ textAlign: 'center', padding: '28px 24px', border: '1px solid rgba(44,62,80,0.1)', borderRadius: 24 }}>
+              <p className="label" style={{ marginBottom: 12 }}>Спасибо!</p>
+              <p style={{ color: '#2c3e50', marginBottom: 20 }}>Ваш отзыв получен. Мы очень ценим вашу обратную связь.</p>
+            </div>
+          ) : !showFeedback ? (
+            <div style={{ textAlign: 'center', padding: '28px 24px', border: '1px solid rgba(44,62,80,0.1)', borderRadius: 24 }}>
+              <p className="label" style={{ marginBottom: 12 }}>Оставить обратную связь</p>
+              <p style={{ color: '#2c3e50', marginBottom: 20 }}>Не обязательно, но вы можете помочь нам сделать тест ещё лучше.</p>
+              <button className="btn btn-primary" onClick={handleOpenFeedback}>Оставить обратную связь</button>
+            </div>
+          ) : (
+            <div style={{ padding: '24px', border: '1px solid rgba(44,62,80,0.1)', borderRadius: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+                <div>
+                  <p className="label">Обратная связь</p>
+                  <p style={{ color: '#5a6c7d', marginTop: 6 }}>Вопрос {feedbackCurrent + 1} из {FEEDBACK_QUESTIONS.length}</p>
+                </div>
+                <button className="btn btn-ghost" onClick={handleFeedbackBack}>← Назад</button>
+              </div>
+
+              <h3 style={{ fontSize: 20, marginBottom: 18 }}>{feedbackQuestion.text}</h3>
+              <div className="option-list">
+                {feedbackQuestion.options.map((opt) => {
+                  const isSelected = feedbackSelectedValue === opt.value;
+                  return (
+                    <button
+                      key={opt.label}
+                      onClick={() => handleFeedbackSelect(opt.value)}
+                      className="option-button"
+                      style={{
+                        background: isSelected ? `${data.levelColor}18` : 'rgba(255,255,255,0.03)',
+                        borderColor: isSelected ? data.levelColor : 'rgba(255,255,255,0.08)',
+                        color: isSelected ? '#1a1a1a' : '#2c3e50',
+                      }}
+                    >
+                      <span
+                        className="radio-dot"
+                        style={{
+                          borderColor: isSelected ? data.levelColor : 'rgba(255,255,255,0.22)',
+                          background: isSelected ? data.levelColor : 'transparent',
+                        }}
+                      >
+                        {isSelected && <span />}
+                      </span>
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: 'flex', gap: 12, marginTop: 18 }}>
+                <button className="btn btn-ghost" onClick={handleFeedbackBack}>← Назад</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleFeedbackNext}
+                  disabled={feedbackSelectedValue === null || feedbackSubmitting}
+                  style={{ flex: 1 }}
+                >
+                  {feedbackCurrent === FEEDBACK_QUESTIONS.length - 1 ? 'Отправить отзыв' : 'Далее'}
+                </button>
+              </div>
+
+              {feedbackMessage && (
+                <p style={{ color: feedbackMessage.includes('Спасибо') ? '#1a891b' : '#e74c3c', marginTop: 16 }}>{feedbackMessage}</p>
+              )}
+            </div>
+          )}
         </section>
       </div>
     </div>

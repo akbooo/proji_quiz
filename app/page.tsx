@@ -58,11 +58,13 @@ function HomeContent() {
           ))}
         </div>
 
-        <Link href={quizHref}>
-          <button className="btn btn-primary" style={{ width: '100%', fontSize: 16, padding: '16px 28px' }}>
-            Пройти диагностику →
-          </button>
-        </Link>
+        <div style={{ display: 'grid', gap: 12, width: '100%' }}>
+          <Link href={quizHref}>
+            <button className="btn btn-primary" style={{ width: '100%', fontSize: 16, padding: '16px 28px' }}>
+              Пройти диагностику →
+            </button>
+          </Link>
+        </div>
 
         <div className="chip-row">
           {blocks.map(({ emoji, label }) => (
