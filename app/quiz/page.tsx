@@ -30,8 +30,8 @@ function QuizContent() {
   const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>('segment');
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [selected, setSelected] = useState<number | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<string | null>(null);
   const [segment, setSegment] = useState<Segment>(EMPTY_SEGMENT);
   const [contact, setContact] = useState<Contact>(EMPTY_CONTACT);
   const [submitting, setSubmitting] = useState(false);
@@ -93,7 +93,14 @@ function QuizContent() {
       return;
     }
 
-    submitAndShowResult(newAnswers);
+    const numericAnswers: Record<string, number> = {};
+    for (const question of QUESTIONS) {
+      const label = newAnswers[question.id];
+      const opt = question.options.find((o) => o.label === label);
+      numericAnswers[question.id] = opt ? opt.value : 0;
+    }
+
+    submitAndShowResult(numericAnswers);
   };
 
   const handleBack = () => {
@@ -229,11 +236,11 @@ function QuizContent() {
             <h2 className="screen-title">{q.text}</h2>
             <div className="option-list">
               {q.options.map((opt) => {
-                const isSelected = selected === opt.value;
+                const isSelected = selected === opt.label;
                 return (
                   <button
                     key={opt.label}
-                    onClick={() => setSelected(opt.value)}
+                    onClick={() => setSelected(opt.label)}
                     className="option-button"
                     style={{
                       background: isSelected ? `${color}18` : 'rgba(255,255,255,0.03)',
