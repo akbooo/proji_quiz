@@ -426,3 +426,48 @@ function calculateLeadScore(
 
   return Math.min(score, 100);
 }
+
+// ============================================================================
+// 5. РАСЧЁТ СКОРА ИЗ ГОТОВЫХ БЛОЧНЫХ ПРОЦЕНТОВ (для AI-вопросов)
+// ============================================================================
+
+export const BLOCK_ORDER: Block[] = [
+  'sales_support',
+  'automation',
+  'data_knowledge',
+  'predictive_ops',
+  'culture_ready',
+];
+
+/**
+ * Принимает уже вычисленные проценты (0-100) по каждому блоку
+ * и строит полноценный ScoreResult (аналогично calculateScore).
+ */
+export function calculateScoreFromRawBlocks(
+  byBlock: Record<Block, number>,
+  segment: Partial<Segment> = {},
+  contact: Partial<Contact> = {},
+): ScoreResult {
+  const blocks = Object.keys(byBlock) as Block[];
+  const total =
+    blocks.length > 0
+      ? Math.round(blocks.reduce((sum, b) => sum + byBlock[b], 0) / blocks.length)
+      : 0;
+
+  const sorted = [...blocks].sort((a, b) => byBlock[a] - byBlock[b]);
+  const weakestBlocks = sorted.slice(0, 3);
+  const strongestBlock = [...sorted].reverse()[0];
+  const levelInfo = getLevelInfo(total);
+  const leadScore = calculateLeadScore(total, byBlock, segment, contact);
+
+  return {
+    total,
+    byBlock,
+    strongestBlock,
+    weakestBlocks,
+    leadScore,
+    ...levelInfo,
+    summary: getSummary(total, weakestBlocks[0], strongestBlock),
+    comparison: getComparison(segment, weakestBlocks[0], total),
+  };
+}

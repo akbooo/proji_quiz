@@ -1,8 +1,5 @@
-'use client';
-
-import { Suspense } from 'react';
+import { getActiveSurveyWithQuestions } from '@/lib/db';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 
 const blocks = [
   { emoji: '💰', label: 'Продажи' },
@@ -12,10 +9,41 @@ const blocks = [
   { emoji: '🤖', label: 'AI-готовность' },
 ];
 
-function HomeContent() {
-  const searchParams = useSearchParams();
-  const query = searchParams.toString();
+type SearchParams = { [key: string]: string | string[] | undefined };
+
+export default async function Home(props: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const searchParams = await props.searchParams;
+
+  // Convert searchParams object to a query string
+  const urlParams = new URLSearchParams();
+  for (const [key, val] of Object.entries(searchParams || {})) {
+    if (typeof val === 'string') {
+      urlParams.set(key, val);
+    } else if (Array.isArray(val)) {
+      val.forEach(v => urlParams.append(key, v));
+    }
+  }
+  const query = urlParams.toString();
   const quizHref = query ? `/quiz?${query}` : '/quiz';
+
+  let questionCount = 11;
+  let surveyTitle = 'Growth Score для бизнеса в Казахстане';
+
+  try {
+    const data = await getActiveSurveyWithQuestions();
+    if (data) {
+      if (data.questions && data.questions.length > 0) {
+        questionCount = data.questions.length;
+      }
+      if (data.survey?.title) {
+        surveyTitle = data.survey.title;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load active survey on server:', err);
+  }
 
   return (
     <div className="page-wrap">
@@ -31,7 +59,7 @@ function HomeContent() {
           marginBottom: 16,
           color: '#1a1a1a',
         }}>
-          Growth Score для бизнеса в Казахстане
+          {surveyTitle}
         </h1>
 
         <p style={{
@@ -42,13 +70,13 @@ function HomeContent() {
           maxWidth: 500,
           margin: '0 auto 34px',
         }}>
-          11 вопросов, профиль зрелости по 5 блокам и понятный сигнал, где бизнес теряет деньги, процессы и скорость команды.
+          {questionCount} вопросов, профиль зрелости по 5 blocks и понятный сигнал, где бизнес теряет деньги, процессы и скорость команды.
         </p>
 
         <div className="stats-row">
           {[
             { num: '5', label: 'зон анализа' },
-            { num: '11', label: 'вопросов' },
+            { num: String(questionCount), label: 'вопросов' },
             { num: 'Lead', label: 'скоринг' },
           ].map(({ num, label }) => (
             <div key={label}>
@@ -79,17 +107,5 @@ function HomeContent() {
         Ответы сохраняются для аналитики Proji и помогают подготовить короткий разбор под вашу компанию.
       </p>
     </div>
-  );
-}
-
-export default function Home() {
-  return (
-    <Suspense fallback={
-      <div className="page-wrap">
-        <div style={{ color: '#5a6c7d' }}>Загружаем...</div>
-      </div>
-    }>
-      <HomeContent />
-    </Suspense>
   );
 }

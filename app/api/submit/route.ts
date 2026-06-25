@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
+import { saveSubmissionRecord } from '@/lib/db';
 
 const SHEET_HEADERS = [
   'Дата',
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       submissionId,
+      surveyId,
       answers = {},
       feedback = {},
       segment = {},
@@ -63,6 +65,28 @@ export async function POST(req: NextRequest) {
       weakestBlocks = [],
       strongestBlock = '',
     } = body;
+
+    // Save to local PostgreSQL database
+    let dbRespondentId = null;
+    try {
+      dbRespondentId = await saveSubmissionRecord({
+        submissionId,
+        surveyId,
+        answers,
+        segment,
+        contact,
+        tracking,
+        scores,
+        total,
+        level,
+        leadScore,
+        weakestBlocks,
+        strongestBlock,
+        feedback,
+      });
+    } catch (dbErr) {
+      console.error('PostgreSQL save error:', dbErr);
+    }
 
     const SHEET_ID = process.env.GOOGLE_SHEET_ID;
     const CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
