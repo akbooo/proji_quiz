@@ -14,7 +14,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { title, description, questionCount, tone, focus, extraContext } = body;
+  const { title, description, questionCount, tone, focus, extraContext, categories } = body;
 
   if (!title || !description) {
     return NextResponse.json({ error: 'Title and description are required' }, { status: 400 });
@@ -23,9 +23,9 @@ export async function POST(request: NextRequest) {
   const count = typeof questionCount === 'number' && [3, 5, 7, 12].includes(questionCount) ? questionCount : 7;
 
   try {
-    const promptText = buildSurveyPrompt(title, description, count, tone, focus, extraContext);
+    const promptText = buildSurveyPrompt(title, description, count, tone, focus, extraContext, categories);
     const draft = await generateSurveyFromPrompt(promptText, title, description, count);
-    const survey = await createSurveyRecord({ title: draft.title, description: draft.description, promptSource: 'groq', promptText });
+    const survey = await createSurveyRecord({ title: draft.title, description: draft.description, promptSource: 'groq', promptText, categories });
 
     await Promise.all(
       draft.questions.map((question, index) =>

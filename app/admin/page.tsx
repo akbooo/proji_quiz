@@ -11,6 +11,7 @@ interface SurveyItem {
   created_at: string;
   question_count: number;
   respondent_count: number;
+  is_featured?: boolean;
 }
 
 type Tab = 'create' | 'surveys';
@@ -43,6 +44,7 @@ export default function AdminPage() {
   const [extraContext, setExtraContext] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
 
   // Surveys list state
   const [surveys, setSurveys] = useState<SurveyItem[]>([]);
@@ -86,7 +88,16 @@ export default function AdminPage() {
       const response = await fetch('/api/surveys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, questionCount, tone, focus, extraContext, promptSource: 'groq' }),
+        body: JSON.stringify({ 
+          title, 
+          description, 
+          questionCount, 
+          tone, 
+          focus, 
+          extraContext, 
+          promptSource: 'groq',
+          categories: categories.filter(c => c.trim().length > 0)
+        }),
       });
 
       if (response.ok) {
@@ -95,6 +106,7 @@ export default function AdminPage() {
         setTitle('');
         setDescription('');
         setExtraContext('');
+        setCategories([]);
         // Optionally navigate
         // router.push(`/survey/${data.surveyId}`);
         return;
@@ -146,14 +158,30 @@ export default function AdminPage() {
     }
   };
 
+  const toggleFeature = async (survey: SurveyItem) => {
+    try {
+      const newStatus = !survey.is_featured;
+      const res = await fetch(`/api/surveys/${survey.id}/feature`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_featured: newStatus })
+      });
+      if (res.ok) {
+        setSurveys(surveys.map(s => s.id === survey.id ? { ...s, is_featured: newStatus } : s));
+      }
+    } catch (err) {
+      console.error('Failed to toggle feature', err);
+    }
+  };
+
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' });
 
   return (
-    <div className="page-wrap" style={{ alignItems: 'flex-start', paddingTop: 40 }}>
-      <div className="card" style={{ maxWidth: 700 }}>
+    <div className="page-wrap" style={{ alignItems: 'center', paddingTop: 40 }}>
+      <div className="card" style={{ maxWidth: 700, width: '100%' }}>
         {/* Header */}
-        <div style={{ marginBottom: 28 }}>
+        <div style={{ marginBottom: 28, textAlign: 'center' }}>
           <span className="label">Панель администратора</span>
           <h1 className="screen-title" style={{ marginTop: 6 }}>AI-генератор опросников</h1>
           <p className="screen-copy" style={{ marginBottom: 0 }}>
@@ -213,6 +241,69 @@ export default function AdminPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={loading}
               />
+            </div>
+
+            {/* Custom categories */}
+            <div className="field-label" style={{ marginTop: 16 }}>
+              <label style={{ fontWeight: 600 }}>Категории опроса (блоки)</label>
+              <p style={{ fontSize: 13, color: 'var(--text3)', margin: '-4px 0 6px', fontWeight: 400 }}>
+                Задайте свои категории. Если оставить пустыми, будут использованы стандартные 5 категорий готовности бизнеса.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {categories.map((cat, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      className="field-control"
+                      placeholder={`Название категории ${idx + 1}`}
+                      value={cat}
+                      onChange={(e) => {
+                        const copy = [...categories];
+                        copy[idx] = e.target.value;
+                        setCategories(copy);
+                      }}
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCategories(categories.filter((_, i) => i !== idx));
+                      }}
+                      disabled={loading}
+                      style={{
+                        padding: '0 16px',
+                        borderRadius: 8,
+                        border: '1px solid var(--border)',
+                        background: 'rgba(192,57,43,0.08)',
+                        color: '#c0392b',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        fontSize: 13,
+                      }}
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCategories([...categories, ''])}
+                  disabled={loading}
+                  style={{
+                    alignSelf: 'flex-start',
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    border: '1.5px dashed var(--primary-blue)',
+                    background: 'transparent',
+                    color: 'var(--primary-blue)',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    marginTop: 4,
+                  }}
+                >
+                  ➕ Добавить категорию
+                </button>
+              </div>
             </div>
 
             {/* Question count */}
@@ -301,9 +392,6 @@ export default function AdminPage() {
               >
                 {loading ? '⏳ Генерируем...' : '✨ Создать и сделать активным'}
               </button>
-              <Link href="/respondents">
-                <button className="btn btn-ghost" disabled={loading}>Респонденты</button>
-              </Link>
             </div>
 
             {status && (
@@ -370,8 +458,10 @@ export default function AdminPage() {
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', marginBottom: 4 }}>
-                      {survey.title}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>
+                        {survey.title}
+                      </div>
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--text3)', lineHeight: 1.5 }}>
                       {survey.description?.slice(0, 100)}{survey.description?.length > 100 ? '…' : ''}
@@ -389,6 +479,18 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+                    <button
+                      onClick={() => toggleFeature(survey)}
+                      style={{
+                        width: '100%', padding: '8px 14px', borderRadius: 8,
+                        border: survey.is_featured ? '1px solid #f39c12' : '1px solid var(--border)', 
+                        background: survey.is_featured ? '#fdf2e9' : 'rgba(255,255,255,0.7)',
+                        cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+                        color: survey.is_featured ? '#e67e22' : 'var(--text)',
+                      }}
+                    >
+                      {survey.is_featured ? '⭐ На главной' : '☆ На главную'}
+                    </button>
                     <a href={`/survey/${survey.id}`} target="_blank">
                       <button
                         style={{
@@ -397,9 +499,21 @@ export default function AdminPage() {
                           cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                         }}
                       >
-                        👁 Открыть
+                        👁 Открыть опрос
                       </button>
                     </a>
+                    <Link href={`/admin/surveys/${survey.id}`}>
+                      <button
+                        style={{
+                          width: '100%', padding: '8px 14px', borderRadius: 8,
+                          border: '1px solid var(--primary-blue)', background: 'var(--primary-blue)',
+                          color: '#fff',
+                          cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                        }}
+                      >
+                        📊 Аналитика
+                      </button>
+                    </Link>
                     <button
                       onClick={() => openRegen(survey)}
                       style={{

@@ -15,13 +15,7 @@ const FOCUS_INSTRUCTION: Record<string, string> = {
   nps: 'Фокус: готовность участников рекомендовать мероприятие или продукт другим.',
 };
 
-const BLOCKS_DESCRIPTION = `
-Вопросы должны равномерно охватывать 5 блоков готовности бизнеса к ИИ:
-- Блок 1 «Продажи и Клиентский сервис»: применение ИИ в продажах, лидогенерации, поддержке клиентов.
-- Блок 2 «Рутинные процессы»: автоматизация повторяющихся задач, использование нейросетей.
-- Блок 3 «Данные и База знаний»: зрелость данных, регламентов и базы знаний для ИИ.
-- Блок 4 «Операционка и Прогнозы»: управление процессами, планирование, предиктивная аналитика.
-- Блок 5 «Культура и Готовность команды»: отношение руководства и команды к ИИ-трансформации.`;
+
 
 const VALID_BLOCKS = ['sales_support', 'automation', 'data_knowledge', 'predictive_ops', 'culture_ready'] as const;
 
@@ -32,34 +26,53 @@ export function buildSurveyPrompt(
   tone?: string,
   focus?: string,
   extraContext?: string,
+  categories?: string[],
 ) {
   const toneNote = tone && TONE_INSTRUCTION[tone] ? TONE_INSTRUCTION[tone] : '';
   const focusNote = focus && FOCUS_INSTRUCTION[focus] ? FOCUS_INSTRUCTION[focus] : '';
   const extra = extraContext?.trim() ? `Дополнительные уточнения: ${extraContext.trim()}` : '';
-  const perBlock = Math.ceil(questionCount / 5);
+  
+  let categoriesPrompt = '';
+  let validBlocksList: string[] = [];
+  
+  if (categories && categories.length > 0) {
+    const perBlock = Math.ceil(questionCount / categories.length);
+    categoriesPrompt = `КАТЕГОРИИ (блоки). Каждый вопрос ОБЯЗАТЕЛЬНО должен иметь поле "block" — один из следующих ID:\n`;
+    categories.forEach((cat, idx) => {
+      const blockId = `cat_${idx}`;
+      validBlocksList.push(blockId);
+      categoriesPrompt += `- "${blockId}" — ${cat} (${perBlock} вопр.)\n`;
+    });
+  } else {
+    const perBlock = Math.ceil(questionCount / 5);
+    categoriesPrompt = `КАТЕГОРИИ (блоки). Каждый вопрос ОБЯЗАТЕЛЬНО должен иметь поле "block" — один из 5 ID:
+- "sales_support"   — продажи, клиентский сервис, лидогенерация (${perBlock} вопр.)
+- "automation"      — процессы, операции, автоматизация (${perBlock} вопр.)
+- "data_knowledge"  — данные, регламенты, база знаний (${perBlock} вопр.)
+- "predictive_ops"  — планирование, аналитика, прогнозирование (${perBlock} вопр.)
+- "culture_ready"   — команда, культура, готовность к изменениям (${perBlock} вопр.)`;
+    validBlocksList = ['sales_support', 'automation', 'data_knowledge', 'predictive_ops', 'culture_ready'];
+  }
+
+  const exampleBlock = validBlocksList[0];
 
   return `
-Ты — профессиональный составитель опросов. Составь опросник для оценки готовности бизнеса к ИИ.
+Ты — профессиональный составитель опросов.
 
 Тема: ${title}
 Описание: ${description}
 
-КАТЕГОРИИ (блоки). Каждый вопрос ОБЯЗАТЕЛЬНО должен иметь поле "block" — один из 5 ID:
-- "sales_support"   — продажи, лидогенерация, CRM, поддержка клиентов (${perBlock} вопр.)
-- "automation"      — рутинные задачи, нейросети в операциях (${perBlock} вопр.)
-- "data_knowledge"  — данные, регламенты, база знаний (${perBlock} вопр.)
-- "predictive_ops"  — управление, планирование, прогнозирование (${perBlock} вопр.)
-- "culture_ready"   — culture ready, культура и готовность команды к ИИ (${perBlock} вопр.)
+${categoriesPrompt}
 
 Правила:
 1. РОВНО ${questionCount} вопросов — не больше, не меньше.
-2. РОВНО 4 варианта ответа на каждый вопрос, упорядоченных ОТ наиболее AI-готового (10 баллов) ДО наименее готового (0 баллов).
-3. Каждый вопрос строго по теме своего блока (block).
+2. РОВНО 4 варианта ответа на каждый вопрос, упорядоченных от самого лучшего/продвинутого до самого базового/худшего. При этом НЕ пиши баллы или веса (вроде «(10 баллов)» или «[10]») в тексте вариантов ответов! Варианты должны содержать только чистый текст ответа.
+3. Каждый вопрос строго по теме своего блока (block) И по теме опроса.
 4. Не спрашивай контактные данные (имя, email, телефон).
 5. Один emoji на вопрос.
-6. ОБЯЗАТЕЛЬНО обращайся к респонденту уважительно на «вы» / «Вы» / «ваш» / «ваша» / «вашем» (например: «Какой тип данных вы храните...», «Как вы используете...», «Внедрены ли у вас...»).
-7. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО писать от первого лица «мы» / «наш» / «наша» / «мы храним» / «мы собираем».
-8. Пиши на чистом, естественном и грамотном русском языке. НЕ смешивай английские и русские слова (никаких "мы.collect", "вы.collect", английских терминов посреди русского предложения без перевода). Все термины должны быть переведены или написаны общепринятым образом на русском языке.
+6. ОБЯЗАТЕЛЬНО обращайся к респонденту уважительно на «вы» / «Вы» / «ваш» / «ваша» / «вашем».
+7. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО писать от первого лица «мы» / «наш» / «наша».
+8. Пиши на чистом, естественном и грамотном русском языке. НЕ смешивай английские и русские слова без перевода. ИСПОЛЬЗУЙ ТОЛЬКО РУССКИЙ ЯЗЫК. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО использовать китайские (иероглифы), английские или любые другие языки, кроме русского.
 ${toneNote ? `9. ${toneNote}` : ''}
 ${focusNote ? `10. ${focusNote}` : ''}
 ${extra ? `11. ${extra}` : ''}
@@ -71,10 +84,10 @@ ${extra ? `11. ${extra}` : ''}
   "questions": [
     {
       "text": "Текст вопроса?",
-      "icon": "🤖",
+      "icon": "📊",
       "type": "choice",
-      "block": "sales_support",
-      "options": ["Активно используем AI в продажах", "Пробовали точечно", "Планируем, но не начали", "Не используем вообще"]
+      "block": "${exampleBlock}",
+      "options": ["Самый продвинутый вариант", "Хороший уровень", "Базовый уровень", "Не применяем"]
     }
   ]
 }
@@ -102,9 +115,9 @@ function parseSurveyDraft(rawText: string): SurveyDraft | null {
       .map((item: any) => {
         // Validate and normalise block
         const rawBlock = typeof item.block === 'string' ? item.block.trim() : '';
-        const block = (VALID_BLOCKS as readonly string[]).includes(rawBlock)
-          ? rawBlock
-          : 'culture_ready'; // safe fallback
+        const isValid = rawBlock.startsWith('cat_') || 
+                        ['sales_support', 'automation', 'data_knowledge', 'predictive_ops', 'culture_ready'].includes(rawBlock);
+        const block = isValid ? rawBlock : 'culture_ready'; // safe fallback
         return {
           text: item.text,
           icon: typeof item.icon === 'string' ? item.icon : '📝',
@@ -188,7 +201,7 @@ export async function generateSurveyFromPrompt(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
+      model: 'llama-3.3-70b-versatile',
       messages: [
         {
           role: 'user',
